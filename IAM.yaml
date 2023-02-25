@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: IAM stack for staging environment
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Naming convention setting
+        Parameters:
+          - Env
+          - SystemName
+
+Parameters:
+  Env:
+    Default: "prd"
+    Type: String
+    Description: "Environment name"
+  SystemName:
+    Default: "practice"
+    Type: String
+    Description: "System name"
+
+Resources:
+  EC2Role:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        - "arn:aws:iam::aws:policy/CloudWatchAgentAdminPolicy"
+        - "arn:aws:iam::aws:policy/CloudWatchLogsReadOnlyAccess"
+        - "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+        - "arn:aws:iam::aws:policy/AmazonSSMFullAccess"
+      Path: "/"
+      RoleName: !Sub ${SystemName}-${Env}-ec2-role
+      Tags:
+        - Key: Name
+          Value: !Sub ${SystemName}-${Env}-ec2-role
+        - Key: Env
+          Value: !Sub ${Env}
+        - Key: SystemName
+          Value: !Sub ${SystemName}
+
+  # ------------
+  # RDS IAM Role
+  # ------------
+  RDSRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "monitoring.rds.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
+      Path: "/"
+      RoleName: !Sub ${SystemName}-${Env}-aurora-monitoring-role
+      Tags:
+        - Key: Name
+          Value: !Sub ${SystemName}-${Env}-aurora-monitoring-role
+        - Key: Env
+          Value: !Sub ${Env}
+        - Key: SystemName
+          Value: !Sub ${SystemName}
+
+Outputs:
+  EC2Role:
+    Value: !Ref EC2Role
+    Description: Export EC2 Role in staging
+    Export:
+      Name: StgEC2Role
+
+  RDSRoleArn:
+    Value: !GetAtt RDSRole.Arn
+    Export:
+      Name: StgRDSRoleArn
