@@ -1,0 +1,90 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: EC2 Template for UMI
+# ------------------------------------------------------------#
+# Parameters
+# ------------------------------------------------------------#
+Parameters:
+  Prefix:
+    Type: String
+    Description: Name tag Prefix .
+    Default: "umi"
+  ENV:
+    Description: Environment Type.
+    Type: String
+    Default: "prd"
+
+
+# ------------------------------------------------------------#
+# Resources
+# ------------------------------------------------------------#
+Resources:
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${Prefix}-${ENV}-eip"
+
+  WebInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      #KeyName: !Ref KeyName
+      DisableApiTermination: Yes
+      ImageId: "ami-0cd7ad8676931d727"
+      Monitoring: true
+      IamInstanceProfile: !Ref Ec2IamRoleInstanceProfile
+      InstanceType: "m6i.large"
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub ${Prefix}-${ENV}-sg-ec2
+      SubnetId:
+        Fn::ImportValue: !Sub ${Prefix}-${ENV}-frontend-subnet-public-1a
+      EbsOptimized: true
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sda1"
+          Ebs:
+            VolumeType: gp3
+            VolumeSize: 180
+            DeleteOnTermination: true
+            Encrypted: true
+      UserData:
+        Fn::Base64: 
+          !Sub |
+            #!/bin/bash
+            yum update -y
+            yum install -y httpd.x86_64
+            systemctl start httpd.service
+            systemctl enable httpd.service
+            echo ?Hello World from $(hostname -f)? > /var/www/html/index.html      
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-${ENV}-web-server
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties: 
+      EIP: !Ref ElasticIP
+      InstanceId: !Ref WebInstance
+
+  Ec2IamRoleInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      InstanceProfileName: !Sub ${Prefix}-${ENV}-instance-profile
+      Path: "/"
+      Roles:
+        - Fn::ImportValue: !Sub ${Prefix}-${ENV}-role-ec2
+# ------------------------------------------------------------#
+# Outputs
+# ------------------------------------------------------------#
+Outputs:
+  InstanceID:
+    Value: !Ref WebInstance
+    Description: WebInstance
+    Export:
+      Name: !Sub ${Prefix}-${ENV}-web-server
+
+  Ec2IamRoleInstanceProfile:
+    Value: !Ref Ec2IamRoleInstanceProfile
+    Description: EC2 Instance proifile
+    Export:
+      Name: !Sub ${Prefix}-${ENV}-instance-profile
