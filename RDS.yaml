@@ -1,0 +1,144 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: RDS MySQL Instance.
+
+Parameters:
+  Prefix:
+    Type: String
+    Description: Name tag Prefix.
+    Default: "practice"
+  ENV:
+    Description: Environment Type.
+    Type: String
+    Default: "prd"
+
+  DatabaseName:
+    Description: "Database Name"
+    Type: String
+    Default: "PracticeDatabase"
+
+  DBAllocatedStorage: 
+    Type: String
+    Default: "20"
+    Description: "Database Volume Size"
+
+  DBInstanceClass: 
+    Type: String
+    Default: "db.t4g.medium"
+    Description: "Database Instance Class" 
+
+  DBMasterUser: 
+    Type: String
+    NoEcho: true
+    Description: "Master Username" 
+
+  DBMasterUserPassword: 
+    Type: String
+    NoEcho: true
+    Description: "Master User Password"
+
+  DBEngine:
+    Type: String
+    Default: MySQL
+    Description: "MySQL Database Engine"
+
+  DBEngineVersion:
+    Type: String
+    Default: 8.0.31
+    Description: "DB Engine Version"
+  
+  MultiAz:
+    Type: "String"
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+
+  DBTimezone:
+    Description: ""
+    Type: String
+    Default: Asia/Tokyo
+    AllowedValues:
+      - Asia/Tokyo
+      - UTC
+
+Resources: 
+  DatabaseInstance:
+    Type: AWS::RDS::DBInstance
+    Properties: 
+      AllocatedStorage: !Ref DBAllocatedStorage
+      AutoMinorVersionUpgrade: false
+      BackupRetentionPeriod: 7
+      CopyTagsToSnapshot: True
+      DBInstanceClass: !Ref DBInstanceClass
+      DBInstanceIdentifier: !Sub ${Prefix}-${ENV}-rds-instance
+      DBName: !Ref DatabaseName
+      DBParameterGroupName: !Ref ParameterGroup
+      DBSubnetGroupName: !Ref SubnetGroup
+      EnableCloudwatchLogsExports: 
+        - audit
+        - error
+        - general
+        - slowquery
+      #DeleteAutomatedBackups: false
+      DeletionProtection: true
+      EnablePerformanceInsights: True
+      Engine: !Ref DBEngine
+      EngineVersion: !Ref DBEngineVersion
+      MasterUsername: !Ref DBMasterUser
+      MasterUserPassword: !Ref DBMasterUserPassword
+      MaxAllocatedStorage: 20
+      MaxAllocatedStorage: 1000
+      MonitoringInterval: 60
+      MonitoringRoleArn: arn:aws:iam::244192264121:role/practice-prd-rds-monitoring
+      MultiAZ: true
+      OptionGroupName: !Ref OptionGroup
+      PerformanceInsightsRetentionPeriod: 7
+      Port: 3306
+      PreferredBackupWindow: 21:00-22:00
+      PreferredMaintenanceWindow: sat:22:00-sat:23:00
+      PubliclyAccessible: false
+      StorageEncrypted: true
+      StorageType: gp2
+      VPCSecurityGroups: 
+        - Fn::ImportValue: !Sub ${Prefix}-${ENV}-sg-rds
+       
+  
+# ------------------------------------------------------------#
+#  Subnet Group
+# ------------------------------------------------------------#
+  SubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties:
+      DBSubnetGroupName: !Sub ${Prefix}-${ENV}-rds-subnet-group
+      DBSubnetGroupDescription: !Sub ${Prefix}-${ENV}-rds-subnet-group
+      SubnetIds:
+        - Fn::ImportValue: !Sub ${Prefix}-${ENV}-data-subnet-private-1a
+        - Fn::ImportValue: !Sub ${Prefix}-${ENV}-data-subnet-private-1c
+
+
+  ParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Family: mysql8.0
+      Description: !Sub ${Prefix}-${ENV}-rds-parameter-group
+      Parameters:
+        character_set_client : utf8mb4
+        character_set_connection : utf8mb4
+        character_set_database : utf8mb4
+        character_set_server : utf8mb4
+        character_set_filesystem : utf8mb4
+        character_set_results : utf8mb4
+        time_zone: !Ref DBTimezone
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-${ENV}-rds-parameter-group
+
+  OptionGroup:
+    Type: "AWS::RDS::OptionGroup"
+    Properties:
+      EngineName: "mysql"
+      MajorEngineVersion: "8.0"
+      OptionGroupDescription: !Sub ${Prefix}-${ENV}-rds-optiomn-group
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-${ENV}-rds-optiomn-group
